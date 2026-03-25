@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "lib": ["ES2020"],
+    "module": "CommonJS",
+    "target": "ES2020",
+    "jsx": "react-jsx",
+    "moduleResolution": "node",
+    "allowJs": false,
+    "strict": true,
+    "noEmit": true
+  },
+  "exclude": ["node_modules"]
+}

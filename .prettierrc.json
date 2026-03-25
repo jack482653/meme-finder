@@ -1,0 +1,14 @@
+{
+  "trailingComma": "all",
+  "singleQuote": false,
+  "arrowParens": "always",
+  "semi": true,
+  "importOrder": [
+    "^@raycast/(.*)$",
+    "^react$",
+    "<THIRD_PARTY_MODULES>",
+    "^[./]"
+  ],
+  "importOrderSortSpecifiers": true,
+  "plugins": ["@trivago/prettier-plugin-sort-imports"]
+}
