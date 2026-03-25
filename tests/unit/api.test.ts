@@ -102,6 +102,20 @@ describe("searchMemes", () => {
     await expect(searchMemes("meme", 9, KLIPY_KEY, GIPHY_KEY)).rejects.toBeInstanceOf(SearchError);
   });
 
+  it("returns [] when Klipy is empty and Giphy is not configured", async () => {
+    mockFetchOnce({ data: [] }); // Klipy empty
+    const results = await searchMemes("meme", 9, KLIPY_KEY, "");
+    expect(results).toEqual([]);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns [] when both APIs return empty results", async () => {
+    mockFetchOnce({ data: [] }); // Klipy empty
+    mockFetchOnce({ data: [] }); // Giphy empty
+    const results = await searchMemes("meme", 9, KLIPY_KEY, GIPHY_KEY);
+    expect(results).toEqual([]);
+  });
+
   it("clamps limit=0 to 1", async () => {
     mockFetchOnce(klipySuccessResponse);
     await searchMemes("meme", 0, KLIPY_KEY, GIPHY_KEY);

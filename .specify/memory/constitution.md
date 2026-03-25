@@ -141,4 +141,4 @@ a team convention and a principle here, the constitution wins.
 **Compliance review**: Every PR description MUST include a one-line Constitution Check
 confirming no principle is violated, or explicitly documenting the justified exception.
 
-**Version**: 1.0.1 | **Ratified**: 2026-03-23 | **Last Amended**: 2026-03-25
+**Version**: 1.1.0 | **Ratified**: 2026-03-23 | **Last Amended**: 2026-03-26

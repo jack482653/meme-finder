@@ -155,7 +155,7 @@ Raycast picks up the extension automatically. Open Raycast, type the command nam
 
 ---
 
-## 5. Using the Extension
+## 6. Using the Extension
 
 1. `⌘ Space` — open Raycast
 2. Type `meme` (or your command name) → `↵` to open the extension
@@ -167,18 +167,17 @@ Raycast picks up the extension automatically. Open Raycast, type the command nam
 **Optional actions** (shown in Action Panel `⌘ K`):
 - **Copy** (`↵`) — copy image to clipboard
 - **Paste** (`⌘ ↵`) — paste directly into focused app without clipboard
-- **Preview** (`⌘ Y` / Quick Look) — view full-size animated GIF
 
 ---
 
-## 6. Configure N Results
+## 7. Configure N Results
 
 `⌘ ,` in Raycast (or Raycast → Preferences → Extensions → Meme Finder) →
 change **"Number of Results"** to any value between 1 and 20.
 
 ---
 
-## 7. Build for Distribution
+## 8. Build for Distribution
 
 ```bash
 pnpm build

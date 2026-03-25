@@ -89,12 +89,13 @@ export async function searchMemes(
   // Fallback: Giphy
   if (giphyApiKey) {
     try {
-      const results = await searchGiphy(query, clampedLimit, giphyApiKey);
-      if (results.length > 0) return results;
+      // Return Giphy results directly (including empty array — empty is not an error)
+      return await searchGiphy(query, clampedLimit, giphyApiKey);
     } catch (err) {
       throw new SearchError("Could not load memes. Check your connection and API keys.", err);
     }
   }
 
-  throw new SearchError("Could not load memes. Please configure your API keys in Preferences.");
+  // Klipy returned no results (or failed) and Giphy is not configured — return empty, not an error
+  return [];
 }
