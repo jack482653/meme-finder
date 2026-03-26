@@ -54,6 +54,10 @@ export async function copyImageToClipboard(url: string): Promise<void> {
     await Clipboard.copy({ file: tmpPath });
   } catch (err) {
     throw new ClipboardError("Failed to copy meme to clipboard", err);
+  } finally {
+    fs.unlink(tmpPath, () => {
+      // Best-effort cleanup; ignore errors
+    });
   }
 }
 
@@ -70,5 +74,9 @@ export async function pasteImageDirectly(url: string): Promise<void> {
     await Clipboard.paste({ file: tmpPath });
   } catch (err) {
     throw new ClipboardError("Failed to paste meme", err);
+  } finally {
+    fs.unlink(tmpPath, () => {
+      // Best-effort cleanup; ignore errors
+    });
   }
 }

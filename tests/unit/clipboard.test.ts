@@ -85,16 +85,24 @@ describe("downloadToTemp", () => {
 });
 
 describe("copyImageToClipboard", () => {
-  it("downloads image and calls Clipboard.copy with file path", async () => {
+  it("downloads image and calls Clipboard.copy with file path, then cleans up", async () => {
     mockFetchSuccess();
     await copyImageToClipboard(FAKE_URL);
     expect(Clipboard.copy).toHaveBeenCalledWith({ file: expect.stringContaining("meme-12345") });
+    expect(mockedFs.unlink).toHaveBeenCalledWith(
+      expect.stringContaining("meme-12345"),
+      expect.any(Function),
+    );
   });
 
-  it("throws ClipboardError when Clipboard.copy throws", async () => {
+  it("cleans up temp file even when Clipboard.copy throws", async () => {
     mockFetchSuccess();
     (Clipboard.copy as jest.Mock).mockRejectedValueOnce(new Error("Permission denied"));
     await expect(copyImageToClipboard(FAKE_URL)).rejects.toBeInstanceOf(ClipboardError);
+    expect(mockedFs.unlink).toHaveBeenCalledWith(
+      expect.stringContaining("meme-12345"),
+      expect.any(Function),
+    );
   });
 
   it("throws ClipboardError when download fails", async () => {
@@ -105,15 +113,23 @@ describe("copyImageToClipboard", () => {
 });
 
 describe("pasteImageDirectly", () => {
-  it("downloads image and calls Clipboard.paste with file path", async () => {
+  it("downloads image and calls Clipboard.paste with file path, then cleans up", async () => {
     mockFetchSuccess();
     await pasteImageDirectly(FAKE_URL);
     expect(Clipboard.paste).toHaveBeenCalledWith({ file: expect.stringContaining("meme-12345") });
+    expect(mockedFs.unlink).toHaveBeenCalledWith(
+      expect.stringContaining("meme-12345"),
+      expect.any(Function),
+    );
   });
 
-  it("throws ClipboardError when Clipboard.paste throws", async () => {
+  it("cleans up temp file even when Clipboard.paste throws", async () => {
     mockFetchSuccess();
     (Clipboard.paste as jest.Mock).mockRejectedValueOnce(new Error("Paste failed"));
     await expect(pasteImageDirectly(FAKE_URL)).rejects.toBeInstanceOf(ClipboardError);
+    expect(mockedFs.unlink).toHaveBeenCalledWith(
+      expect.stringContaining("meme-12345"),
+      expect.any(Function),
+    );
   });
 });

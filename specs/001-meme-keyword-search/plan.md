@@ -60,7 +60,7 @@ specs/001-meme-keyword-search/
 ### Source Code (repository root)
 
 ```text
-meme-finder/
+/  (repository root)
 ├── package.json              # Raycast manifest, dependencies, preferences schema
 ├── src/
 │   ├── search-meme.tsx       # Main command — Grid UI, search state

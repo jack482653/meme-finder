@@ -28,11 +28,15 @@ function fromGiphy(item: GiphyItem): MemeResult {
 }
 
 async function searchKlipy(query: string, limit: number, apiKey: string): Promise<MemeResult[]> {
-  const url =
-    `https://api.klipy.com/api/v1/${encodeURIComponent(apiKey)}/memes/search` +
-    `?q=${encodeURIComponent(query)}&per_page=${limit}&page=1&customer_id=raycast_user`;
+  const url = new URL(`https://api.klipy.com/api/v1/${encodeURIComponent(apiKey)}/memes/search`);
+  url.search = new URLSearchParams({
+    q: query,
+    per_page: String(limit),
+    page: "1",
+    customer_id: "raycast_user",
+  }).toString();
 
-  const response = await fetch(url);
+  const response = await fetch(url.toString());
   if (!response.ok) {
     throw new Error(`Klipy responded with ${response.status}`);
   }
@@ -42,11 +46,16 @@ async function searchKlipy(query: string, limit: number, apiKey: string): Promis
 }
 
 async function searchGiphy(query: string, limit: number, apiKey: string): Promise<MemeResult[]> {
-  const url =
-    `https://api.giphy.com/v1/gifs/search` +
-    `?api_key=${encodeURIComponent(apiKey)}&q=${encodeURIComponent(query)}&limit=${limit}&rating=g&lang=en`;
+  const url = new URL("https://api.giphy.com/v1/gifs/search");
+  url.search = new URLSearchParams({
+    api_key: apiKey,
+    q: query,
+    limit: String(limit),
+    rating: "g",
+    lang: "en",
+  }).toString();
 
-  const response = await fetch(url);
+  const response = await fetch(url.toString());
   if (!response.ok) {
     throw new Error(`Giphy responded with ${response.status}`);
   }

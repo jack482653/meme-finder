@@ -104,7 +104,7 @@ This section captures measurable gates applied during development and review.
 | Metric                    | Threshold         | Enforcement         |
 |---------------------------|-------------------|---------------------|
 | Page load (4G)            | < 3 s             | Lighthouse CI       |
-| Search / query response   | < 1 s p95 (< 2 s p95 for external-API extensions) | API integration test|
+| Search / query response   | < 1 s p95 (< 2 s p95 for external-API extensions) | API integration test |
 | Core action response      | < 200 ms perceived| Manual + perf test  |
 | Web bundle (gzip)         | < 500 KB          | Bundle analyzer CI  |
 | Test coverage (new code)  | ≥ 80 % lines      | Coverage report CI  |
