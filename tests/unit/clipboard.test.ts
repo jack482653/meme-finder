@@ -19,10 +19,11 @@ const FAKE_TMP = "/tmp";
 const FAKE_URL = "https://example.com/meme.gif";
 const FAKE_ARRAY_BUFFER = new ArrayBuffer(4);
 
-function mockFetchSuccess() {
+function mockFetchSuccess(contentType = "image/gif") {
   global.fetch = jest.fn().mockResolvedValue({
     ok: true,
     status: 200,
+    headers: { get: (name: string) => (name === "Content-Type" ? contentType : null) },
     arrayBuffer: async () => FAKE_ARRAY_BUFFER,
   });
 }
@@ -31,6 +32,7 @@ function mockFetchFailure(status = 404) {
   global.fetch = jest.fn().mockResolvedValue({
     ok: false,
     status,
+    headers: { get: () => null },
     arrayBuffer: async () => FAKE_ARRAY_BUFFER,
   });
 }

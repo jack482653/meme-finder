@@ -74,6 +74,7 @@ function mockImageDownload() {
   global.fetch = jest.fn().mockResolvedValue({
     ok: true,
     status: 200,
+    headers: { get: (name: string) => (name === "Content-Type" ? "image/gif" : null) },
     arrayBuffer: async () => new ArrayBuffer(4),
   });
   mockedOs.tmpdir.mockReturnValue("/tmp");

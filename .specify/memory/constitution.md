@@ -2,6 +2,8 @@
 SYNC IMPACT REPORT
 ==================
 Version change: [unversioned template] → 1.0.0 (initial ratification)
+Amendment 1.1.0 (2026-03-26): Principle IV — added 2s p95 exception for
+  external-API Raycast extensions (MINOR: material expansion of guidance)
 
 Modified principles: N/A (first version, all principles newly authored)
 

@@ -113,15 +113,21 @@ Tasks:
 
 **Done when**: FR-004, FR-005 pass; SC-005 verified.
 
-### Phase 3 — Preview (P3 User Story, zero extra code)
+### Phase 3 — Preview (P3 User Story) ⏸ DEFERRED POST-MVP
 
 **Goal**: User can preview a meme full-size before copying.
 
 Tasks:
-1. Add `quickLook` prop to `<Grid.Item>` pointing to `previewUrl`
+1. Add `quickLook` prop to `<Grid.Item>` — **requires a local file path, not a URL**.
+   The image at `previewUrl` must first be downloaded to `os.tmpdir()` (reuse `downloadToTemp()`
+   from `clipboard.ts`), then the local path is passed as `quickLook.path`.
 2. Add `Action.ToggleQuickLook` to `MemeActions.tsx`
 
-**Done when**: US3 acceptance scenarios pass. (This is ~5 lines of code using Raycast built-ins.)
+**Note**: `quickLook.path` is a Raycast constraint — it does not accept remote URLs.
+This means each focused Grid.Item triggers an async download, which adds non-trivial
+complexity (download state management, error handling per item). Estimated: ~30 LOC.
+
+**Done when**: US3 acceptance scenarios pass.
 
 ## Key Implementation Notes
 

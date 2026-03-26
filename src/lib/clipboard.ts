@@ -27,8 +27,9 @@ export async function downloadToTemp(url: string): Promise<string> {
     throw new ClipboardError(`Failed to download meme image: server returned ${response.status}`);
   }
 
+  const contentType = response.headers.get("Content-Type");
+  const ext = contentType?.split("/")?.[1]?.split("+")?.[0] ?? extensionFromUrl(url);
   const buffer = Buffer.from(await response.arrayBuffer());
-  const ext = extensionFromUrl(url);
   const tmpPath = path.join(os.tmpdir(), `meme-${Date.now()}.${ext}`);
 
   try {
