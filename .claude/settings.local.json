@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:developers.google.com)",
+      "WebFetch(domain:developers.giphy.com)",
+      "WebFetch(domain:developers.raycast.com)",
+      "WebFetch(domain:imgflip.com)",
+      "WebFetch(domain:docs.klipy.com)",
+      "WebFetch(domain:www.raycast.com)",
+      "WebFetch(domain:digitalbiztalk.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:www.adamrichardson.dev)",
+      "Bash(pnpm test:*)"
+    ]
+  }
+}

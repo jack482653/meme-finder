@@ -3,7 +3,7 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 
-import { closeMainWindow } from "@raycast/api";
+import { Clipboard, closeMainWindow } from "@raycast/api";
 
 import { copyImageToClipboard, downloadToTemp, pasteImageDirectly } from "../../src/lib/clipboard";
 import { ClipboardError } from "../../src/types";
@@ -23,7 +23,8 @@ const mockedOs = os as jest.Mocked<typeof os>;
 const mockedPath = path as jest.Mocked<typeof path>;
 
 const FAKE_TMP = "/tmp";
-const FAKE_URL = "https://example.com/meme.gif";
+const FAKE_GIF_URL = "https://example.com/meme.gif";
+const FAKE_PNG_URL = "https://example.com/meme.png";
 const FAKE_ARRAY_BUFFER = new ArrayBuffer(4);
 
 function mockFetchSuccess(contentType = "image/gif") {
@@ -49,6 +50,7 @@ function mockFetchNetworkError() {
 }
 
 beforeEach(() => {
+  jest.useFakeTimers();
   mockedExecFile.mockImplementation(
     (_cmd: string, _args: string[], cb: (err: Error | null, res: string) => void) => cb(null, ""),
   );
@@ -59,13 +61,14 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  jest.useRealTimers();
   jest.resetAllMocks();
 });
 
 describe("downloadToTemp", () => {
   it("downloads image and writes to temp file, returning the path", async () => {
     mockFetchSuccess();
-    const result = await downloadToTemp(FAKE_URL);
+    const result = await downloadToTemp(FAKE_GIF_URL);
     expect(mockedFs.writeFileSync).toHaveBeenCalledWith(
       expect.stringContaining("meme-12345"),
       expect.any(Buffer),
@@ -75,14 +78,14 @@ describe("downloadToTemp", () => {
 
   it("throws ClipboardError on non-ok fetch response", async () => {
     mockFetchFailure(403);
-    await expect(downloadToTemp(FAKE_URL)).rejects.toBeInstanceOf(ClipboardError);
-    await expect(downloadToTemp(FAKE_URL)).rejects.toThrow("403");
+    await expect(downloadToTemp(FAKE_GIF_URL)).rejects.toBeInstanceOf(ClipboardError);
+    await expect(downloadToTemp(FAKE_GIF_URL)).rejects.toThrow("403");
   });
 
   it("throws ClipboardError on network error", async () => {
     mockFetchNetworkError();
-    await expect(downloadToTemp(FAKE_URL)).rejects.toBeInstanceOf(ClipboardError);
-    await expect(downloadToTemp(FAKE_URL)).rejects.toThrow("network error");
+    await expect(downloadToTemp(FAKE_GIF_URL)).rejects.toBeInstanceOf(ClipboardError);
+    await expect(downloadToTemp(FAKE_GIF_URL)).rejects.toThrow("network error");
   });
 
   it("throws ClipboardError when writeFileSync throws", async () => {
@@ -90,29 +93,53 @@ describe("downloadToTemp", () => {
     mockedFs.writeFileSync.mockImplementationOnce(() => {
       throw new Error("ENOSPC: no space left");
     });
-    await expect(downloadToTemp(FAKE_URL)).rejects.toBeInstanceOf(ClipboardError);
+    await expect(downloadToTemp(FAKE_GIF_URL)).rejects.toBeInstanceOf(ClipboardError);
   });
 });
 
-describe("copyImageToClipboard", () => {
-  it("copies GIF directly via osascript without sips conversion", async () => {
-    mockFetchSuccess("image/gif"); // downloads as .gif
-    await copyImageToClipboard(FAKE_URL);
+describe("copyImageToClipboard — GIF", () => {
+  it("uses Clipboard.copy({ file }) and schedules delayed cleanup", async () => {
+    mockFetchSuccess("image/gif");
+    await copyImageToClipboard(FAKE_GIF_URL);
 
-    expect(mockedExecFile).not.toHaveBeenCalledWith("sips", expect.anything(), expect.anything());
+    expect(Clipboard.copy).toHaveBeenCalledWith({ file: expect.stringContaining("meme-12345.gif") });
+    // No immediate unlink
+    expect(mockedFs.unlink).not.toHaveBeenCalled();
+    // After delay, cleanup runs
+    jest.runAllTimers();
+    expect(mockedFs.unlink).toHaveBeenCalledWith(
+      expect.stringContaining("meme-12345.gif"),
+      expect.any(Function),
+    );
+  });
+
+  it("cleans up immediately if Clipboard.copy throws", async () => {
+    mockFetchSuccess("image/gif");
+    (Clipboard.copy as jest.Mock).mockRejectedValueOnce(new Error("denied"));
+    await expect(copyImageToClipboard(FAKE_GIF_URL)).rejects.toBeInstanceOf(ClipboardError);
+    expect(mockedFs.unlink).toHaveBeenCalledWith(
+      expect.stringContaining("meme-12345.gif"),
+      expect.any(Function),
+    );
+  });
+});
+
+describe("copyImageToClipboard — PNG", () => {
+  it("copies PNG via osascript inline, cleans up immediately", async () => {
+    mockFetchSuccess("image/png");
+    await copyImageToClipboard(FAKE_PNG_URL);
+
+    expect(Clipboard.copy).not.toHaveBeenCalled();
     expect(mockedExecFile).toHaveBeenCalledWith(
       "osascript",
       expect.arrayContaining(["-e"]),
       expect.any(Function),
     );
-    const script = mockedExecFile.mock.calls[0][1][1] as string;
-    expect(script).toContain("GIFf");
-    // Only tmpPath cleaned up (no converted file)
     expect(mockedFs.unlink).toHaveBeenCalledTimes(1);
   });
 
-  it("converts WebP to PNG via sips before copying, cleans up both files", async () => {
-    mockFetchSuccess("image/webp"); // downloads as .webp
+  it("converts WebP to PNG via sips before copying", async () => {
+    mockFetchSuccess("image/webp");
     await copyImageToClipboard("https://example.com/meme.webp");
 
     expect(mockedExecFile).toHaveBeenCalledWith(
@@ -120,55 +147,43 @@ describe("copyImageToClipboard", () => {
       expect.arrayContaining(["-s", "format", "png"]),
       expect.any(Function),
     );
+    expect(mockedFs.unlink).toHaveBeenCalledTimes(2);
+  });
+
+  it("throws ClipboardError when download fails", async () => {
+    mockFetchFailure(500);
+    await expect(copyImageToClipboard(FAKE_GIF_URL)).rejects.toBeInstanceOf(ClipboardError);
+    expect(Clipboard.copy).not.toHaveBeenCalled();
+  });
+});
+
+describe("pasteImageDirectly — GIF", () => {
+  it("copies file, closes window, simulates ⌘V, schedules cleanup", async () => {
+    mockFetchSuccess("image/gif");
+    await pasteImageDirectly(FAKE_GIF_URL);
+
+    expect(Clipboard.copy).toHaveBeenCalledWith({ file: expect.stringContaining("meme-12345.gif") });
+    expect(closeMainWindow).toHaveBeenCalled();
     expect(mockedExecFile).toHaveBeenCalledWith(
       "osascript",
       expect.arrayContaining(["-e"]),
       expect.any(Function),
     );
-    expect(mockedFs.unlink).toHaveBeenCalledTimes(2);
-  });
-
-  it("cleans up temp file even when osascript throws", async () => {
-    mockFetchSuccess("image/gif");
-    mockedExecFile.mockImplementationOnce(
-      (_cmd: string, _args: string[], cb: (err: Error | null) => void) => cb(new Error("osascript error")),
-    );
-    await expect(copyImageToClipboard(FAKE_URL)).rejects.toBeInstanceOf(ClipboardError);
-    expect(mockedFs.unlink).toHaveBeenCalledWith(
-      expect.stringContaining("meme-12345"),
-      expect.any(Function),
-    );
-  });
-
-  it("throws ClipboardError when download fails", async () => {
-    mockFetchFailure(500);
-    await expect(copyImageToClipboard(FAKE_URL)).rejects.toBeInstanceOf(ClipboardError);
-    expect(mockedExecFile).not.toHaveBeenCalled();
+    expect(mockedFs.unlink).not.toHaveBeenCalled();
+    jest.runAllTimers();
+    expect(mockedFs.unlink).toHaveBeenCalledTimes(1);
   });
 });
 
-describe("pasteImageDirectly", () => {
-  it("closes window, copies GIF to clipboard and simulates ⌘V, then cleans up", async () => {
-    mockFetchSuccess("image/gif");
-    await pasteImageDirectly(FAKE_URL);
+describe("pasteImageDirectly — PNG", () => {
+  it("copies via osascript, closes window, simulates ⌘V, cleans up", async () => {
+    mockFetchSuccess("image/png");
+    await pasteImageDirectly(FAKE_PNG_URL);
 
+    expect(Clipboard.copy).not.toHaveBeenCalled();
     expect(closeMainWindow).toHaveBeenCalled();
-    expect(mockedExecFile).not.toHaveBeenCalledWith("sips", expect.anything(), expect.anything());
-    // clipboard write + keystroke = 2 osascript calls
     const osascriptCalls = mockedExecFile.mock.calls.filter((c) => c[0] === "osascript");
-    expect(osascriptCalls).toHaveLength(2);
+    expect(osascriptCalls).toHaveLength(2); // clipboard write + keystroke
     expect(mockedFs.unlink).toHaveBeenCalledTimes(1);
-  });
-
-  it("cleans up temp file even when osascript throws", async () => {
-    mockFetchSuccess("image/gif");
-    mockedExecFile.mockImplementationOnce(
-      (_cmd: string, _args: string[], cb: (err: Error | null) => void) => cb(new Error("paste failed")),
-    );
-    await expect(pasteImageDirectly(FAKE_URL)).rejects.toBeInstanceOf(ClipboardError);
-    expect(mockedFs.unlink).toHaveBeenCalledWith(
-      expect.stringContaining("meme-12345"),
-      expect.any(Function),
-    );
   });
 });

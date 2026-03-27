@@ -12,7 +12,8 @@ function fromKlipy(item: KlipyItem): MemeResult {
     id: String(item.id),
     title: item.title ?? "",
     thumbnailUrl: item.file.sm.gif?.url ?? item.file.sm.webp.url,
-    previewUrl: item.file.hd.gif?.url ?? item.file.md?.gif?.url ?? item.file.hd.png.url,
+    // Prefer medium GIF (smaller file size); fall back to hd gif then png
+    previewUrl: item.file.md?.gif?.url ?? item.file.hd.gif?.url ?? item.file.hd.png.url,
     sourceApi: "klipy",
   };
 }
@@ -28,7 +29,7 @@ function fromGiphy(item: GiphyItem): MemeResult {
 }
 
 async function searchKlipy(query: string, limit: number, apiKey: string): Promise<MemeResult[]> {
-  const url = new URL(`https://api.klipy.com/api/v1/${encodeURIComponent(apiKey)}/static-memes/search`);
+  const url = new URL(`https://api.klipy.com/api/v1/${encodeURIComponent(apiKey)}/gifs/search`);
   url.search = new URLSearchParams({
     q: query,
     per_page: String(limit),

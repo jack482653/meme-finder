@@ -1,3 +1,5 @@
+import "cross-fetch/polyfill";
+
 import { Grid, getPreferenceValues, showToast, Toast } from "@raycast/api";
 import { useCallback, useRef, useState } from "react";
 

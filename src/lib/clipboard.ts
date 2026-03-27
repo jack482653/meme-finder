@@ -4,11 +4,15 @@ import * as os from "os";
 import * as path from "path";
 import { promisify } from "util";
 
-import { closeMainWindow } from "@raycast/api";
+import { Clipboard, closeMainWindow } from "@raycast/api";
 
 import { ClipboardError } from "../types";
 
 const execFileAsync = promisify(execFile);
+
+// How long to keep temp GIF files on disk after clipboard copy so the
+// destination app (e.g. Slack) has time to read the file before cleanup.
+const GIF_CLEANUP_DELAY_MS = 60_000;
 
 function extensionFromUrl(url: string): string {
   const match = url.split("?")[0].match(/\.(\w+)$/);
@@ -45,19 +49,12 @@ export async function downloadToTemp(url: string): Promise<string> {
 }
 
 /**
- * Put raw image data on the macOS clipboard so apps can paste it inline.
- * GIF and PNG are written directly; other formats (WebP, etc.) are converted
- * to PNG via sips first.
- * Returns a cleanup path if a temporary conversion file was created.
+ * Copy a static image (PNG / WebP / etc.) to the clipboard as raw image data
+ * so it pastes inline in apps. WebP is converted to PNG via sips first.
+ * Returns a converted file path if one was created (caller must clean up).
  */
-async function putImageOnClipboard(srcPath: string): Promise<string | undefined> {
+async function copyStaticImageToClipboard(srcPath: string): Promise<string | undefined> {
   const ext = srcPath.split(".").pop()?.toLowerCase() ?? "";
-
-  if (ext === "gif") {
-    const script = `set the clipboard to (read (POSIX file ${JSON.stringify(srcPath)}) as «class GIFf»)`;
-    await execFileAsync("osascript", ["-e", script]);
-    return undefined;
-  }
 
   if (ext === "png") {
     const script = `set the clipboard to (read (POSIX file ${JSON.stringify(srcPath)}) as «class PNGf»)`;
@@ -74,17 +71,34 @@ async function putImageOnClipboard(srcPath: string): Promise<string | undefined>
 }
 
 /**
- * Download the image at `url` and copy it to the system clipboard as raw
- * PNG data so it pastes inline in Slack and macOS Messages.
+ * Download the image at `url` and copy it to the system clipboard.
+ *
+ * - GIF: copied as a file reference so Slack/Messages upload it as animated GIF.
+ *   The temp file is deleted after a delay to give the destination app time to
+ *   read it.
+ * - PNG / other: copied as raw image data for true inline paste.
  *
  * @throws ClipboardError if download or clipboard write fails
  */
 export async function copyImageToClipboard(url: string): Promise<void> {
   const tmpPath = await downloadToTemp(url);
-  let convertedPath: string | undefined;
+  const ext = tmpPath.split(".").pop()?.toLowerCase() ?? "";
 
+  if (ext === "gif") {
+    try {
+      await Clipboard.copy({ file: tmpPath });
+    } catch (err) {
+      fs.unlink(tmpPath, () => {});
+      throw new ClipboardError("Failed to copy meme to clipboard", err);
+    }
+    // Delay cleanup so the destination app can read the file before it's gone
+    setTimeout(() => fs.unlink(tmpPath, () => {}), GIF_CLEANUP_DELAY_MS);
+    return;
+  }
+
+  let convertedPath: string | undefined;
   try {
-    convertedPath = await putImageOnClipboard(tmpPath);
+    convertedPath = await copyStaticImageToClipboard(tmpPath);
   } catch (err) {
     throw new ClipboardError("Failed to copy meme to clipboard", err);
   } finally {
@@ -100,12 +114,28 @@ export async function copyImageToClipboard(url: string): Promise<void> {
  */
 export async function pasteImageDirectly(url: string): Promise<void> {
   const tmpPath = await downloadToTemp(url);
-  let convertedPath: string | undefined;
+  const ext = tmpPath.split(".").pop()?.toLowerCase() ?? "";
 
+  if (ext === "gif") {
+    try {
+      await Clipboard.copy({ file: tmpPath });
+      await closeMainWindow();
+      await execFileAsync("osascript", [
+        "-e",
+        'tell application "System Events" to keystroke "v" using {command down}',
+      ]);
+    } catch (err) {
+      fs.unlink(tmpPath, () => {});
+      throw new ClipboardError("Failed to paste meme", err);
+    }
+    setTimeout(() => fs.unlink(tmpPath, () => {}), GIF_CLEANUP_DELAY_MS);
+    return;
+  }
+
+  let convertedPath: string | undefined;
   try {
     await closeMainWindow();
-    convertedPath = await putImageOnClipboard(tmpPath);
-    // Simulate ⌘V in the now-focused app
+    convertedPath = await copyStaticImageToClipboard(tmpPath);
     await execFileAsync("osascript", [
       "-e",
       'tell application "System Events" to keystroke "v" using {command down}',

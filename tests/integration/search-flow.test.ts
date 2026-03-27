@@ -6,20 +6,16 @@
  * all internal mapping and error logic runs for real.
  */
 
-import * as childProcess from "child_process";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
+
+import { Clipboard } from "@raycast/api";
 
 import { searchMemes } from "../../src/lib/api";
 import { copyImageToClipboard } from "../../src/lib/clipboard";
 import { SearchError } from "../../src/types";
 
-jest.mock("child_process", () => ({
-  execFile: jest.fn((_cmd: string, _args: string[], cb: (err: Error | null, res: string) => void) =>
-    cb(null, ""),
-  ),
-}));
 jest.mock("fs");
 jest.mock("os");
 jest.mock("path");
@@ -90,14 +86,17 @@ function mockImageDownload() {
 }
 
 beforeEach(() => {
+  jest.useFakeTimers();
   jest.spyOn(Date, "now").mockReturnValue(99999);
-  (childProcess.execFile as unknown as jest.Mock).mockImplementation(
-    (_cmd: string, _args: string[], cb: (err: Error | null, res: string) => void) => cb(null, ""),
-  );
+});
+
+afterEach(() => {
+  jest.useRealTimers();
 });
 
 afterEach(() => {
   jest.resetAllMocks();
+  jest.useRealTimers();
 });
 
 describe("search → results (Klipy primary)", () => {
@@ -128,7 +127,7 @@ describe("search → results (Klipy primary)", () => {
 });
 
 describe("results → clipboard (copy flow)", () => {
-  it("downloads preview URL and copies to clipboard via osascript", async () => {
+  it("downloads GIF preview URL and copies as file via Clipboard.copy", async () => {
     mockKlipySuccess();
     const results = await searchMemes("this is fine", 9, KLIPY_KEY, GIPHY_KEY);
     expect(results.length).toBeGreaterThan(0);
@@ -140,11 +139,8 @@ describe("results → clipboard (copy flow)", () => {
       expect.stringContaining("meme-99999"),
       expect.any(Buffer),
     );
-    const mockedExecFile = childProcess.execFile as unknown as jest.Mock;
-    expect(mockedExecFile).toHaveBeenCalledWith(
-      "osascript",
-      expect.arrayContaining(["-e"]),
-      expect.any(Function),
-    );
+    expect(Clipboard.copy).toHaveBeenCalledWith({
+      file: expect.stringContaining("meme-99999"),
+    });
   });
 });
