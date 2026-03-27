@@ -1,16 +1,23 @@
+import * as childProcess from "child_process";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 
-import { Clipboard } from "@raycast/api";
+import { closeMainWindow } from "@raycast/api";
 
 import { copyImageToClipboard, downloadToTemp, pasteImageDirectly } from "../../src/lib/clipboard";
 import { ClipboardError } from "../../src/types";
 
+jest.mock("child_process", () => ({
+  execFile: jest.fn((_cmd: string, _args: string[], cb: (err: Error | null, res: string) => void) =>
+    cb(null, ""),
+  ),
+}));
 jest.mock("fs");
 jest.mock("os");
 jest.mock("path");
 
+const mockedExecFile = childProcess.execFile as unknown as jest.Mock;
 const mockedFs = fs as jest.Mocked<typeof fs>;
 const mockedOs = os as jest.Mocked<typeof os>;
 const mockedPath = path as jest.Mocked<typeof path>;
@@ -42,6 +49,9 @@ function mockFetchNetworkError() {
 }
 
 beforeEach(() => {
+  mockedExecFile.mockImplementation(
+    (_cmd: string, _args: string[], cb: (err: Error | null, res: string) => void) => cb(null, ""),
+  );
   mockedOs.tmpdir.mockReturnValue(FAKE_TMP);
   mockedPath.join.mockImplementation((...args) => args.join("/"));
   mockedFs.writeFileSync.mockReturnValue(undefined);
@@ -85,51 +95,73 @@ describe("downloadToTemp", () => {
 });
 
 describe("copyImageToClipboard", () => {
-  it("downloads image and calls Clipboard.copy with file path, then cleans up", async () => {
+  it("converts to PNG via sips and copies via osascript, then cleans up both temp files", async () => {
     mockFetchSuccess();
     await copyImageToClipboard(FAKE_URL);
-    expect(Clipboard.copy).toHaveBeenCalledWith({ file: expect.stringContaining("meme-12345") });
-    expect(mockedFs.unlink).toHaveBeenCalledWith(
-      expect.stringContaining("meme-12345"),
+
+    expect(mockedExecFile).toHaveBeenCalledWith(
+      "sips",
+      expect.arrayContaining(["-s", "format", "png"]),
       expect.any(Function),
     );
+    expect(mockedExecFile).toHaveBeenCalledWith(
+      "osascript",
+      expect.arrayContaining(["-e"]),
+      expect.any(Function),
+    );
+    // Both tmpPath and pngPath cleaned up
+    expect(mockedFs.unlink).toHaveBeenCalledTimes(2);
   });
 
-  it("cleans up temp file even when Clipboard.copy throws", async () => {
+  it("cleans up temp files even when osascript throws", async () => {
     mockFetchSuccess();
-    (Clipboard.copy as jest.Mock).mockRejectedValueOnce(new Error("Permission denied"));
+    mockedExecFile
+      .mockImplementationOnce((_cmd: string, _args: string[], cb: (err: Error | null, res: string) => void) =>
+        cb(null, ""),
+      ) // sips succeeds
+      .mockImplementationOnce((_cmd: string, _args: string[], cb: (err: Error | null) => void) =>
+        cb(new Error("osascript error")),
+      ); // osascript fails
     await expect(copyImageToClipboard(FAKE_URL)).rejects.toBeInstanceOf(ClipboardError);
-    expect(mockedFs.unlink).toHaveBeenCalledWith(
-      expect.stringContaining("meme-12345"),
-      expect.any(Function),
-    );
+    expect(mockedFs.unlink).toHaveBeenCalledTimes(2);
   });
 
   it("throws ClipboardError when download fails", async () => {
     mockFetchFailure(500);
     await expect(copyImageToClipboard(FAKE_URL)).rejects.toBeInstanceOf(ClipboardError);
-    expect(Clipboard.copy).not.toHaveBeenCalled();
+    expect(mockedExecFile).not.toHaveBeenCalled();
   });
 });
 
 describe("pasteImageDirectly", () => {
-  it("downloads image and calls Clipboard.paste with file path, then cleans up", async () => {
+  it("closes window, puts image on clipboard and simulates paste, then cleans up", async () => {
     mockFetchSuccess();
     await pasteImageDirectly(FAKE_URL);
-    expect(Clipboard.paste).toHaveBeenCalledWith({ file: expect.stringContaining("meme-12345") });
-    expect(mockedFs.unlink).toHaveBeenCalledWith(
-      expect.stringContaining("meme-12345"),
+
+    expect(closeMainWindow).toHaveBeenCalled();
+    expect(mockedExecFile).toHaveBeenCalledWith(
+      "sips",
+      expect.arrayContaining(["-s", "format", "png"]),
       expect.any(Function),
     );
+    expect(mockedExecFile).toHaveBeenCalledWith(
+      "osascript",
+      expect.arrayContaining(["-e"]),
+      expect.any(Function),
+    );
+    expect(mockedFs.unlink).toHaveBeenCalledTimes(2);
   });
 
-  it("cleans up temp file even when Clipboard.paste throws", async () => {
+  it("cleans up temp files even when osascript throws", async () => {
     mockFetchSuccess();
-    (Clipboard.paste as jest.Mock).mockRejectedValueOnce(new Error("Paste failed"));
+    mockedExecFile
+      .mockImplementationOnce((_cmd: string, _args: string[], cb: (err: Error | null, res: string) => void) =>
+        cb(null, ""),
+      ) // sips succeeds
+      .mockImplementationOnce((_cmd: string, _args: string[], cb: (err: Error | null) => void) =>
+        cb(new Error("paste failed")),
+      ); // osascript fails
     await expect(pasteImageDirectly(FAKE_URL)).rejects.toBeInstanceOf(ClipboardError);
-    expect(mockedFs.unlink).toHaveBeenCalledWith(
-      expect.stringContaining("meme-12345"),
-      expect.any(Function),
-    );
+    expect(mockedFs.unlink).toHaveBeenCalledTimes(2);
   });
 });

@@ -3,6 +3,8 @@ export const Clipboard = {
   paste: jest.fn().mockResolvedValue(undefined),
 };
 
+export const closeMainWindow = jest.fn().mockResolvedValue(undefined);
+
 export const getPreferenceValues = jest.fn(() => ({
   klipyApiKey: "test-klipy-key",
   giphyApiKey: "test-giphy-key",
