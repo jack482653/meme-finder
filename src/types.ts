@@ -13,15 +13,31 @@ export interface UserPreferences {
 }
 
 // Raw Klipy API shapes (subset used)
+export interface KlipyImageVariant {
+  url: string;
+  width: number;
+  height: number;
+}
+
+export interface KlipyFile {
+  hd: { png: KlipyImageVariant; webp: KlipyImageVariant };
+  sm: { png: KlipyImageVariant; webp: KlipyImageVariant };
+}
+
 export interface KlipyItem {
-  id: string;
+  id: number;
+  slug: string;
   title?: string;
-  jpg: { sm: { url: string } };
-  gif: { md: { url: string }; hd: { url: string } };
+  file: KlipyFile;
 }
 
 export interface KlipySearchResponse {
-  data: KlipyItem[];
+  result: boolean;
+  data: {
+    data: KlipyItem[];
+    has_next: boolean;
+    current_page: number;
+  };
 }
 
 // Raw Giphy API shapes (subset used)

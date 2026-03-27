@@ -9,10 +9,10 @@ import {
 
 function fromKlipy(item: KlipyItem): MemeResult {
   return {
-    id: item.id,
+    id: String(item.id),
     title: item.title ?? "",
-    thumbnailUrl: item.jpg.sm.url,
-    previewUrl: item.gif.md.url,
+    thumbnailUrl: item.file.sm.webp.url,
+    previewUrl: item.file.hd.png.url,
     sourceApi: "klipy",
   };
 }
@@ -28,7 +28,7 @@ function fromGiphy(item: GiphyItem): MemeResult {
 }
 
 async function searchKlipy(query: string, limit: number, apiKey: string): Promise<MemeResult[]> {
-  const url = new URL(`https://api.klipy.com/api/v1/${encodeURIComponent(apiKey)}/memes/search`);
+  const url = new URL(`https://api.klipy.com/api/v1/${encodeURIComponent(apiKey)}/static-memes/search`);
   url.search = new URLSearchParams({
     q: query,
     per_page: String(limit),
@@ -42,7 +42,7 @@ async function searchKlipy(query: string, limit: number, apiKey: string): Promis
   }
 
   const json = (await response.json()) as KlipySearchResponse;
-  return (json.data ?? []).map(fromKlipy);
+  return (json.data?.data ?? []).map(fromKlipy);
 }
 
 async function searchGiphy(query: string, limit: number, apiKey: string): Promise<MemeResult[]> {

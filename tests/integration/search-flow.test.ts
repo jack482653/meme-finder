@@ -28,10 +28,13 @@ const KLIPY_KEY = "test-klipy-key";
 const GIPHY_KEY = "test-giphy-key";
 
 const KLIPY_ITEM = {
-  id: "k1",
+  id: 1,
+  slug: "this-is-fine",
   title: "This is Fine",
-  jpg: { sm: { url: "https://cdn.klipy.com/thumb.jpg" } },
-  gif: { md: { url: "https://cdn.klipy.com/preview.gif" } },
+  file: {
+    sm: { webp: { url: "https://cdn.klipy.com/thumb.webp", width: 200, height: 200 }, png: { url: "", width: 200, height: 200 } },
+    hd: { png: { url: "https://cdn.klipy.com/preview.png", width: 400, height: 400 }, webp: { url: "", width: 400, height: 400 } },
+  },
 };
 
 const GIPHY_ITEM = {
@@ -47,7 +50,7 @@ function mockKlipySuccess() {
   global.fetch = jest.fn().mockResolvedValue({
     ok: true,
     status: 200,
-    json: async () => ({ data: [KLIPY_ITEM] }),
+    json: async () => ({ result: true, data: { data: [KLIPY_ITEM], has_next: false, current_page: 1 } }),
   });
 }
 
@@ -57,7 +60,7 @@ function mockKlipyEmptyThenGiphySuccess() {
     .mockResolvedValueOnce({
       ok: true,
       status: 200,
-      json: async () => ({ data: [] }),
+      json: async () => ({ result: true, data: { data: [], has_next: false, current_page: 1 } }),
     })
     .mockResolvedValueOnce({
       ok: true,
@@ -96,11 +99,11 @@ describe("search → results (Klipy primary)", () => {
     const results = await searchMemes("this is fine", 9, KLIPY_KEY, GIPHY_KEY);
     expect(results).toHaveLength(1);
     expect(results[0]).toMatchObject({
-      id: "k1",
+      id: "1",
       title: "This is Fine",
       sourceApi: "klipy",
-      thumbnailUrl: "https://cdn.klipy.com/thumb.jpg",
-      previewUrl: "https://cdn.klipy.com/preview.gif",
+      thumbnailUrl: "https://cdn.klipy.com/thumb.webp",
+      previewUrl: "https://cdn.klipy.com/preview.png",
     });
   });
 

@@ -5,14 +5,22 @@ const KLIPY_KEY = "test-klipy-key";
 const GIPHY_KEY = "test-giphy-key";
 
 const klipySuccessResponse = {
-  data: [
-    {
-      id: "klipy-1",
-      title: "This Is Fine",
-      jpg: { sm: { url: "https://static.klipy.com/thumb.jpg" } },
-      gif: { md: { url: "https://static.klipy.com/preview.gif" }, hd: { url: "" } },
-    },
-  ],
+  result: true,
+  data: {
+    data: [
+      {
+        id: 1,
+        slug: "this-is-fine",
+        title: "This Is Fine",
+        file: {
+          sm: { webp: { url: "https://static.klipy.com/thumb.webp", width: 200, height: 200 }, png: { url: "", width: 200, height: 200 } },
+          hd: { png: { url: "https://static.klipy.com/preview.png", width: 400, height: 400 }, webp: { url: "", width: 400, height: 400 } },
+        },
+      },
+    ],
+    has_next: false,
+    current_page: 1,
+  },
 };
 
 const giphySuccessResponse = {
@@ -66,16 +74,16 @@ describe("searchMemes", () => {
     const results = await searchMemes("this is fine", 9, KLIPY_KEY, GIPHY_KEY);
     expect(results).toHaveLength(1);
     expect(results[0]).toMatchObject({
-      id: "klipy-1",
+      id: "1",
       title: "This Is Fine",
-      thumbnailUrl: "https://static.klipy.com/thumb.jpg",
-      previewUrl: "https://static.klipy.com/preview.gif",
+      thumbnailUrl: "https://static.klipy.com/thumb.webp",
+      previewUrl: "https://static.klipy.com/preview.png",
       sourceApi: "klipy",
     });
   });
 
   it("falls back to Giphy when Klipy returns empty array", async () => {
-    mockFetchOnce({ data: [] }); // Klipy empty
+    mockFetchOnce({ result: true, data: { data: [], has_next: false, current_page: 1 } }); // Klipy empty
     mockFetchOnce(giphySuccessResponse); // Giphy success
     const results = await searchMemes("pikachu", 9, KLIPY_KEY, GIPHY_KEY);
     expect(results[0].sourceApi).toBe("giphy");
@@ -103,14 +111,14 @@ describe("searchMemes", () => {
   });
 
   it("returns [] when Klipy is empty and Giphy is not configured", async () => {
-    mockFetchOnce({ data: [] }); // Klipy empty
+    mockFetchOnce({ result: true, data: { data: [], has_next: false, current_page: 1 } }); // Klipy empty
     const results = await searchMemes("meme", 9, KLIPY_KEY, "");
     expect(results).toEqual([]);
     expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
   it("returns [] when both APIs return empty results", async () => {
-    mockFetchOnce({ data: [] }); // Klipy empty
+    mockFetchOnce({ result: true, data: { data: [], has_next: false, current_page: 1 } }); // Klipy empty
     mockFetchOnce({ data: [] }); // Giphy empty
     const results = await searchMemes("meme", 9, KLIPY_KEY, GIPHY_KEY);
     expect(results).toEqual([]);
