@@ -44,17 +44,33 @@ export async function downloadToTemp(url: string): Promise<string> {
   return tmpPath;
 }
 
-/** Convert any image file to PNG using macOS sips. Returns the new path. */
-async function toPng(srcPath: string): Promise<string> {
+/**
+ * Put raw image data on the macOS clipboard so apps can paste it inline.
+ * GIF and PNG are written directly; other formats (WebP, etc.) are converted
+ * to PNG via sips first.
+ * Returns a cleanup path if a temporary conversion file was created.
+ */
+async function putImageOnClipboard(srcPath: string): Promise<string | undefined> {
+  const ext = srcPath.split(".").pop()?.toLowerCase() ?? "";
+
+  if (ext === "gif") {
+    const script = `set the clipboard to (read (POSIX file ${JSON.stringify(srcPath)}) as «class GIFf»)`;
+    await execFileAsync("osascript", ["-e", script]);
+    return undefined;
+  }
+
+  if (ext === "png") {
+    const script = `set the clipboard to (read (POSIX file ${JSON.stringify(srcPath)}) as «class PNGf»)`;
+    await execFileAsync("osascript", ["-e", script]);
+    return undefined;
+  }
+
+  // WebP and other formats: convert to PNG first
   const pngPath = `${srcPath}.png`;
   await execFileAsync("sips", ["-s", "format", "png", srcPath, "--out", pngPath]);
-  return pngPath;
-}
-
-/** Put raw PNG image data on the macOS clipboard so apps can paste it inline. */
-async function putImageOnClipboard(pngPath: string): Promise<void> {
   const script = `set the clipboard to (read (POSIX file ${JSON.stringify(pngPath)}) as «class PNGf»)`;
   await execFileAsync("osascript", ["-e", script]);
+  return pngPath;
 }
 
 /**
@@ -65,16 +81,15 @@ async function putImageOnClipboard(pngPath: string): Promise<void> {
  */
 export async function copyImageToClipboard(url: string): Promise<void> {
   const tmpPath = await downloadToTemp(url);
-  let pngPath: string | undefined;
+  let convertedPath: string | undefined;
 
   try {
-    pngPath = await toPng(tmpPath);
-    await putImageOnClipboard(pngPath);
+    convertedPath = await putImageOnClipboard(tmpPath);
   } catch (err) {
     throw new ClipboardError("Failed to copy meme to clipboard", err);
   } finally {
     fs.unlink(tmpPath, () => {});
-    if (pngPath) fs.unlink(pngPath, () => {});
+    if (convertedPath) fs.unlink(convertedPath, () => {});
   }
 }
 
@@ -85,22 +100,20 @@ export async function copyImageToClipboard(url: string): Promise<void> {
  */
 export async function pasteImageDirectly(url: string): Promise<void> {
   const tmpPath = await downloadToTemp(url);
-  let pngPath: string | undefined;
+  let convertedPath: string | undefined;
 
   try {
-    pngPath = await toPng(tmpPath);
     await closeMainWindow();
-    // Put image on clipboard then simulate ⌘V in the now-focused app
-    const script = [
-      `set the clipboard to (read (POSIX file ${JSON.stringify(pngPath)}) as «class PNGf»)`,
-      `delay 0.1`,
-      `tell application "System Events" to keystroke "v" using {command down}`,
-    ].join("\n");
-    await execFileAsync("osascript", ["-e", script]);
+    convertedPath = await putImageOnClipboard(tmpPath);
+    // Simulate ⌘V in the now-focused app
+    await execFileAsync("osascript", [
+      "-e",
+      'tell application "System Events" to keystroke "v" using {command down}',
+    ]);
   } catch (err) {
     throw new ClipboardError("Failed to paste meme", err);
   } finally {
     fs.unlink(tmpPath, () => {});
-    if (pngPath) fs.unlink(pngPath, () => {});
+    if (convertedPath) fs.unlink(convertedPath, () => {});
   }
 }

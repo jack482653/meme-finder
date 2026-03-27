@@ -19,9 +19,16 @@ export interface KlipyImageVariant {
   height: number;
 }
 
+interface KlipySizeVariants {
+  gif?: KlipyImageVariant;
+  webp: KlipyImageVariant;
+  png: KlipyImageVariant;
+}
+
 export interface KlipyFile {
-  hd: { png: KlipyImageVariant; webp: KlipyImageVariant };
-  sm: { png: KlipyImageVariant; webp: KlipyImageVariant };
+  hd: KlipySizeVariants;
+  md?: KlipySizeVariants;
+  sm: KlipySizeVariants;
 }
 
 export interface KlipyItem {

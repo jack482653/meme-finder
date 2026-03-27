@@ -128,7 +128,7 @@ describe("search → results (Klipy primary)", () => {
 });
 
 describe("results → clipboard (copy flow)", () => {
-  it("downloads preview URL and writes PNG to clipboard via osascript", async () => {
+  it("downloads preview URL and copies to clipboard via osascript", async () => {
     mockKlipySuccess();
     const results = await searchMemes("this is fine", 9, KLIPY_KEY, GIPHY_KEY);
     expect(results.length).toBeGreaterThan(0);
@@ -141,11 +141,6 @@ describe("results → clipboard (copy flow)", () => {
       expect.any(Buffer),
     );
     const mockedExecFile = childProcess.execFile as unknown as jest.Mock;
-    expect(mockedExecFile).toHaveBeenCalledWith(
-      "sips",
-      expect.arrayContaining(["-s", "format", "png"]),
-      expect.any(Function),
-    );
     expect(mockedExecFile).toHaveBeenCalledWith(
       "osascript",
       expect.arrayContaining(["-e"]),

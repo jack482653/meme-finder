@@ -95,9 +95,25 @@ describe("downloadToTemp", () => {
 });
 
 describe("copyImageToClipboard", () => {
-  it("converts to PNG via sips and copies via osascript, then cleans up both temp files", async () => {
-    mockFetchSuccess();
+  it("copies GIF directly via osascript without sips conversion", async () => {
+    mockFetchSuccess("image/gif"); // downloads as .gif
     await copyImageToClipboard(FAKE_URL);
+
+    expect(mockedExecFile).not.toHaveBeenCalledWith("sips", expect.anything(), expect.anything());
+    expect(mockedExecFile).toHaveBeenCalledWith(
+      "osascript",
+      expect.arrayContaining(["-e"]),
+      expect.any(Function),
+    );
+    const script = mockedExecFile.mock.calls[0][1][1] as string;
+    expect(script).toContain("GIFf");
+    // Only tmpPath cleaned up (no converted file)
+    expect(mockedFs.unlink).toHaveBeenCalledTimes(1);
+  });
+
+  it("converts WebP to PNG via sips before copying, cleans up both files", async () => {
+    mockFetchSuccess("image/webp"); // downloads as .webp
+    await copyImageToClipboard("https://example.com/meme.webp");
 
     expect(mockedExecFile).toHaveBeenCalledWith(
       "sips",
@@ -109,21 +125,19 @@ describe("copyImageToClipboard", () => {
       expect.arrayContaining(["-e"]),
       expect.any(Function),
     );
-    // Both tmpPath and pngPath cleaned up
     expect(mockedFs.unlink).toHaveBeenCalledTimes(2);
   });
 
-  it("cleans up temp files even when osascript throws", async () => {
-    mockFetchSuccess();
-    mockedExecFile
-      .mockImplementationOnce((_cmd: string, _args: string[], cb: (err: Error | null, res: string) => void) =>
-        cb(null, ""),
-      ) // sips succeeds
-      .mockImplementationOnce((_cmd: string, _args: string[], cb: (err: Error | null) => void) =>
-        cb(new Error("osascript error")),
-      ); // osascript fails
+  it("cleans up temp file even when osascript throws", async () => {
+    mockFetchSuccess("image/gif");
+    mockedExecFile.mockImplementationOnce(
+      (_cmd: string, _args: string[], cb: (err: Error | null) => void) => cb(new Error("osascript error")),
+    );
     await expect(copyImageToClipboard(FAKE_URL)).rejects.toBeInstanceOf(ClipboardError);
-    expect(mockedFs.unlink).toHaveBeenCalledTimes(2);
+    expect(mockedFs.unlink).toHaveBeenCalledWith(
+      expect.stringContaining("meme-12345"),
+      expect.any(Function),
+    );
   });
 
   it("throws ClipboardError when download fails", async () => {
@@ -134,34 +148,27 @@ describe("copyImageToClipboard", () => {
 });
 
 describe("pasteImageDirectly", () => {
-  it("closes window, puts image on clipboard and simulates paste, then cleans up", async () => {
-    mockFetchSuccess();
+  it("closes window, copies GIF to clipboard and simulates ⌘V, then cleans up", async () => {
+    mockFetchSuccess("image/gif");
     await pasteImageDirectly(FAKE_URL);
 
     expect(closeMainWindow).toHaveBeenCalled();
-    expect(mockedExecFile).toHaveBeenCalledWith(
-      "sips",
-      expect.arrayContaining(["-s", "format", "png"]),
-      expect.any(Function),
-    );
-    expect(mockedExecFile).toHaveBeenCalledWith(
-      "osascript",
-      expect.arrayContaining(["-e"]),
-      expect.any(Function),
-    );
-    expect(mockedFs.unlink).toHaveBeenCalledTimes(2);
+    expect(mockedExecFile).not.toHaveBeenCalledWith("sips", expect.anything(), expect.anything());
+    // clipboard write + keystroke = 2 osascript calls
+    const osascriptCalls = mockedExecFile.mock.calls.filter((c) => c[0] === "osascript");
+    expect(osascriptCalls).toHaveLength(2);
+    expect(mockedFs.unlink).toHaveBeenCalledTimes(1);
   });
 
-  it("cleans up temp files even when osascript throws", async () => {
-    mockFetchSuccess();
-    mockedExecFile
-      .mockImplementationOnce((_cmd: string, _args: string[], cb: (err: Error | null, res: string) => void) =>
-        cb(null, ""),
-      ) // sips succeeds
-      .mockImplementationOnce((_cmd: string, _args: string[], cb: (err: Error | null) => void) =>
-        cb(new Error("paste failed")),
-      ); // osascript fails
+  it("cleans up temp file even when osascript throws", async () => {
+    mockFetchSuccess("image/gif");
+    mockedExecFile.mockImplementationOnce(
+      (_cmd: string, _args: string[], cb: (err: Error | null) => void) => cb(new Error("paste failed")),
+    );
     await expect(pasteImageDirectly(FAKE_URL)).rejects.toBeInstanceOf(ClipboardError);
-    expect(mockedFs.unlink).toHaveBeenCalledTimes(2);
+    expect(mockedFs.unlink).toHaveBeenCalledWith(
+      expect.stringContaining("meme-12345"),
+      expect.any(Function),
+    );
   });
 });

@@ -11,8 +11,8 @@ function fromKlipy(item: KlipyItem): MemeResult {
   return {
     id: String(item.id),
     title: item.title ?? "",
-    thumbnailUrl: item.file.sm.webp.url,
-    previewUrl: item.file.hd.png.url,
+    thumbnailUrl: item.file.sm.gif?.url ?? item.file.sm.webp.url,
+    previewUrl: item.file.hd.gif?.url ?? item.file.md?.gif?.url ?? item.file.hd.png.url,
     sourceApi: "klipy",
   };
 }
