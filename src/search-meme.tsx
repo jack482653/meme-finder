@@ -1,7 +1,7 @@
 import "cross-fetch/polyfill";
 
-import { Grid, getPreferenceValues, showToast, Toast } from "@raycast/api";
-import { useCallback, useRef, useState } from "react";
+import { Action, ActionPanel, Grid, getPreferenceValues, showToast, Toast } from "@raycast/api";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { searchMemes } from "./lib/api";
 import { MemeActions } from "./components/MemeActions";
@@ -22,54 +22,73 @@ export default function SearchMeme() {
   const preferences = getPreferenceValues<UserPreferences>();
   const limit = getLimit(preferences);
 
+  const [pendingQuery, setPendingQuery] = useState("");
+  const [activeQuery, setActiveQuery] = useState("");
   const [results, setResults] = useState<MemeResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Track current search to ignore stale responses
   const searchIdRef = useRef(0);
 
-  const handleSearch = useCallback(
-    async (query: string) => {
-      if (query.trim() === "") {
-        setResults([]);
-        setIsLoading(false);
-        return;
-      }
+  // Fired on every keystroke — only tracks what the user typed, no API call
+  const handleSearchChange = useCallback((text: string) => {
+    setPendingQuery(text);
+    if (text.trim() === "") {
+      setActiveQuery("");
+      setResults([]);
+      setIsLoading(false);
+    }
+  }, []);
 
-      const currentId = ++searchIdRef.current;
-      setIsLoading(true);
+  // Fired when the user explicitly confirms the search (↵ on EmptyView)
+  const commitSearch = useCallback(() => {
+    setActiveQuery(pendingQuery);
+  }, [pendingQuery]);
 
-      try {
-        const memes = await searchMemes(
-          query,
-          limit,
-          preferences.klipyApiKey,
-          preferences.giphyApiKey,
-        );
-        if (currentId !== searchIdRef.current) return; // stale
-        setResults(memes);
-      } catch (err) {
+  // Runs the actual API call whenever activeQuery is committed
+  useEffect(() => {
+    if (activeQuery.trim() === "") return;
+
+    const currentId = ++searchIdRef.current;
+    setIsLoading(true);
+    setResults([]);
+
+    searchMemes(activeQuery, limit, preferences.klipyApiKey, preferences.giphyApiKey)
+      .then((memes) => {
         if (currentId !== searchIdRef.current) return;
-        // Preserve previous results so the grid stays visible on transient errors
+        setResults(memes);
+      })
+      .catch((err) => {
+        if (currentId !== searchIdRef.current) return;
         const message = err instanceof SearchError ? err.message : "Search failed";
-        await showToast({ style: Toast.Style.Failure, title: message });
-      } finally {
+        showToast({ style: Toast.Style.Failure, title: message });
+      })
+      .finally(() => {
         if (currentId === searchIdRef.current) setIsLoading(false);
-      }
-    },
-    [limit, preferences.klipyApiKey, preferences.giphyApiKey],
-  );
+      });
+  }, [activeQuery, limit, preferences.klipyApiKey, preferences.giphyApiKey]);
+
+  // User has typed something new that hasn't been searched yet
+  const isSearchPending = pendingQuery.trim() !== "" && pendingQuery !== activeQuery;
 
   return (
     <Grid
       columns={getColumns(limit)}
       isLoading={isLoading}
-      onSearchTextChange={handleSearch}
-      throttle
+      onSearchTextChange={handleSearchChange}
       searchBarPlaceholder="Search memes…"
     >
-      {results.length === 0 && !isLoading ? (
-        <Grid.EmptyView title="No results" description="Try a different keyword" />
+      {isSearchPending ? (
+        <Grid.EmptyView
+          title={`Search for "${pendingQuery}"`}
+          description="Press ↵ to search"
+          actions={
+            <ActionPanel>
+              <Action title="Search" onAction={commitSearch} />
+            </ActionPanel>
+          }
+        />
+      ) : results.length === 0 && !isLoading ? (
+        <Grid.EmptyView title="Type to search" description="Enter a keyword then press ↵" />
       ) : (
         results.map((meme) => (
           <Grid.Item
