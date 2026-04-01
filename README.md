@@ -24,6 +24,7 @@ A [Raycast](https://raycast.com) extension that lets you search for memes by key
    git clone https://github.com/jack482653/meme-finder.git
    cd meme-finder
    pnpm install
+   pnpm build
    ```
 
 2. Open Raycast, run **Import Extension**, and point it at this directory.
